@@ -8,6 +8,7 @@ build-parameters:
   before-all:
     - builder: custom
       commands:
+        - npm install --production
         - npx -p @sap/cds-dk cds build --production
 modules:
   - name: MyHANAApp-srv
@@ -30,6 +31,8 @@ modules:
     path: db #gen/db
     parameters:
       buildpack: nodejs_buildpack
+    build-parameters:
+      ignore: ["default-env.json", ".env"]
     requires:
       - name: MyHANAApp-db
 
@@ -37,17 +40,26 @@ modules:
     type: approuter.nodejs
     path: app/ # from cds.env.folders. Consider also cds.env.build.target -> gen/app
     parameters:
-      keep-existing-routes: true
+      # keep-existing-routes: true
       disk-quota: 256M
       memory: 256M
+    
     requires:
+      - name: uaa_MyHANAApp
       - name: srv-api
         group: destinations
         properties:
           name: srv-api # must be used in xs-app.json as well
           url: ~{srv-url}
           forwardAuthToken: true
-      - name: MyHANAApp-auth
+      # - name: MyHANAApp-auth
+      parameters:
+        disk-quota: 256M
+        memory: 256M
+        build-parameters:
+          ignore:
+            - default-env.json
+            - .env
 
 resources:
   - name: MyHANAApp-db
@@ -55,12 +67,15 @@ resources:
     parameters:
       service: hana
       service-plan: hdi-shared
-  - name: MyHANAApp-auth
+    properties:
+      hdi-service-name: ${service-name}
+  - name: uaa_MyHANAApp
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
       service-plan: application
       path: ./xs-security.json
+      service-name: MyHANAApp-xsuaa-service
       config:
         xsappname: MyHANAApp-${org}-${space}
         tenant-mode: dedicated
